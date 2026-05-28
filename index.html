@@ -1,0 +1,1792 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>外星人单词救援</title>
+  <style>
+    :root {
+      --bg-top: #061126;
+      --bg-mid: #15284b;
+      --bg-bottom: #213d73;
+      --panel: rgba(10, 18, 43, 0.82);
+      --panel-border: rgba(255, 255, 255, 0.12);
+      --text: #f5f8ff;
+      --muted: rgba(245, 248, 255, 0.74);
+      --accent: #2fa9ff;
+      --accent-strong: #007fe6;
+      --gold: #ffd85a;
+      --danger: #ff6677;
+      --success: #6cffbf;
+      --game-height: 78vh;
+      --header-size: clamp(1.05rem, 6vw, 1.55rem);
+      --shadow: 0 18px 36px rgba(0, 0, 0, 0.3);
+      --base-font: "Trebuchet MS", "Segoe UI", sans-serif;
+      --display-font: "Arial Black", "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: var(--base-font);
+      color: var(--text);
+      background:
+        radial-gradient(circle at 16% 18%, rgba(73, 165, 255, 0.24), transparent 26%),
+        radial-gradient(circle at 82% 14%, rgba(139, 117, 255, 0.18), transparent 22%),
+        radial-gradient(circle at 50% 86%, rgba(54, 255, 194, 0.13), transparent 20%),
+        linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 48%, var(--bg-bottom) 100%);
+      overflow-x: hidden;
+    }
+
+    body {
+      position: relative;
+      touch-action: manipulation;
+      transition: background 0.8s ease, filter 0.5s ease;
+    }
+
+    body.victory-mode {
+      background:
+        radial-gradient(circle at 18% 18%, rgba(154, 225, 255, 0.38), transparent 28%),
+        radial-gradient(circle at 82% 12%, rgba(255, 220, 136, 0.26), transparent 24%),
+        radial-gradient(circle at 50% 85%, rgba(106, 255, 198, 0.2), transparent 22%),
+        linear-gradient(180deg, #12325e 0%, #2f548f 45%, #4877ba 100%);
+    }
+
+    body.failure-mode {
+      filter: brightness(0.82) saturate(0.82);
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    body::before {
+      background-image:
+        radial-gradient(2px 2px at 8% 16%, rgba(255,255,255,0.92), transparent 60%),
+        radial-gradient(1.5px 1.5px at 20% 74%, rgba(255,255,255,0.72), transparent 60%),
+        radial-gradient(2px 2px at 39% 28%, rgba(255,255,255,0.9), transparent 60%),
+        radial-gradient(1.5px 1.5px at 62% 18%, rgba(255,255,255,0.76), transparent 60%),
+        radial-gradient(2px 2px at 80% 64%, rgba(255,255,255,0.9), transparent 60%),
+        radial-gradient(1.5px 1.5px at 91% 29%, rgba(255,255,255,0.7), transparent 60%),
+        radial-gradient(2px 2px at 72% 88%, rgba(255,255,255,0.85), transparent 60%);
+      opacity: 0.85;
+      animation: twinkle 4.8s ease-in-out infinite alternate;
+    }
+
+    body::after {
+      background:
+        linear-gradient(120deg, transparent 0 46%, rgba(255,255,255,0.05) 48%, transparent 50% 100%);
+      mix-blend-mode: screen;
+      opacity: 0.55;
+      animation: drift 14s linear infinite;
+    }
+
+    .app {
+      position: relative;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 14px 8px 24px;
+    }
+
+    .hud {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .stat {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: var(--header-size);
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+
+    .stat small {
+      font-size: 0.5em;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .score-value,
+    .best-value {
+      color: var(--gold);
+      text-shadow: 0 0 12px rgba(255, 216, 90, 0.28);
+    }
+
+    .lives {
+      color: var(--danger);
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .best {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 10px;
+      margin-bottom: 12px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      background: linear-gradient(180deg, var(--accent) 0%, var(--accent-strong) 100%);
+      color: #fff;
+      font-weight: 800;
+      font-size: 16px;
+      box-shadow: 0 10px 22px rgba(0, 126, 231, 0.28);
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: transform 0.12s ease, opacity 0.12s ease, box-shadow 0.16s ease;
+    }
+
+    button:hover {
+      box-shadow: 0 12px 26px rgba(0, 126, 231, 0.34);
+    }
+
+    button:active {
+      transform: scale(0.97);
+      opacity: 0.9;
+    }
+
+    .tool-btn {
+      min-height: 42px;
+      min-width: 96px;
+      padding: 0 14px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: none;
+    }
+
+    .icon-toggle {
+      position: relative;
+      width: 52px;
+      min-width: 52px;
+      height: 52px;
+      min-height: 52px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255,255,255,0.14);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+    }
+
+    .sound-svg {
+      width: 28px;
+      height: 28px;
+      overflow: visible;
+    }
+
+    .speaker-fill {
+      fill: #ffffff;
+    }
+
+    .sound-wave {
+      stroke: #98ddff;
+      stroke-width: 4.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      transition: opacity 0.18s ease;
+    }
+
+    .sound-slash {
+      stroke: #ff5b6d;
+      stroke-width: 6;
+      stroke-linecap: round;
+      opacity: 0;
+      transition: opacity 0.18s ease;
+    }
+
+    .icon-toggle.muted .sound-wave {
+      opacity: 0.18;
+    }
+
+    .icon-toggle.muted .sound-slash {
+      opacity: 1;
+    }
+
+    .game-shell {
+      position: relative;
+      min-height: var(--game-height);
+    }
+
+    .game-area {
+      position: relative;
+      height: var(--game-height);
+      overflow: hidden;
+      border-radius: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background:
+        radial-gradient(circle at top, rgba(255,255,255,0.08), transparent 50%),
+        linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(6px);
+      transition: transform 0.18s ease, box-shadow 0.3s ease, background 0.6s ease;
+    }
+
+    .game-area.hit-shake {
+      animation: screen-shake 0.32s ease;
+    }
+
+    .game-area.victory-bg {
+      background:
+        radial-gradient(circle at top, rgba(255,255,255,0.15), transparent 48%),
+        linear-gradient(180deg, rgba(152, 244, 255, 0.11), rgba(255,255,255,0.04));
+      box-shadow: 0 0 32px rgba(149, 230, 255, 0.22), var(--shadow);
+    }
+
+    .grid-overlay {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+      background-size: 24px 24px;
+      opacity: 0.12;
+      pointer-events: none;
+    }
+
+    .lane {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(150px, 1fr));
+      gap: 10px;
+      align-content: start;
+      padding: 10px;
+      pointer-events: auto;
+      z-index: 2;
+    }
+
+    .effect-layer {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    .word-card {
+      position: absolute;
+      width: min(100%, 250px);
+      min-width: 150px;
+      background:
+        radial-gradient(circle at top right, rgba(149, 253, 206, 0.2), transparent 38%),
+        radial-gradient(circle at top left, rgba(181, 136, 255, 0.18), transparent 35%),
+        rgba(29, 36, 72, 0.95);
+      border: 1px solid rgba(162, 235, 205, 0.22);
+      border-radius: 18px;
+      box-shadow: 0 18px 28px rgba(0, 0, 0, 0.28), 0 0 24px rgba(124, 255, 182, 0.08);
+      padding: 12px;
+      pointer-events: auto;
+      will-change: transform;
+      animation: spawn 0.26s ease;
+      transition: transform 0.03s linear, opacity 0.22s ease, filter 0.22s ease;
+    }
+
+    .word-card.success-glow {
+      box-shadow: 0 0 28px rgba(133, 255, 191, 0.3), 0 18px 28px rgba(0, 0, 0, 0.28);
+    }
+
+    .word-card.fail-glow {
+      background:
+        radial-gradient(circle at top right, rgba(255, 118, 118, 0.24), transparent 38%),
+        radial-gradient(circle at top left, rgba(255, 165, 184, 0.2), transparent 35%),
+        rgba(69, 31, 49, 0.95);
+      border-color: rgba(255, 142, 151, 0.36);
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .alien-avatar {
+      position: relative;
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 36%, #9effb8 0%, #5bd58a 68%, #39b56c 100%);
+      box-shadow: 0 0 18px rgba(111, 255, 166, 0.24);
+      animation: alien-float 1.9s ease-in-out infinite;
+    }
+
+    .alien-avatar::before,
+    .alien-avatar::after {
+      content: "";
+      position: absolute;
+      top: 13px;
+      width: 9px;
+      height: 13px;
+      background: #11182f;
+      border-radius: 50%;
+      transform: rotate(18deg);
+    }
+
+    .alien-avatar::before {
+      left: 11px;
+    }
+
+    .alien-avatar::after {
+      right: 11px;
+      transform: rotate(-18deg);
+    }
+
+    .alien-label {
+      font-size: 0.78rem;
+      color: rgba(245,248,255,0.7);
+      letter-spacing: 0.04em;
+    }
+
+    .word-block {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .word-text {
+      margin: 0 0 4px;
+      font-family: var(--display-font);
+      font-size: clamp(1.45rem, 6.2vw, 1.9rem);
+      letter-spacing: 0.12em;
+      color: #fff;
+      text-shadow: 0 0 12px rgba(255,255,255,0.2);
+    }
+
+    .word-hint {
+      margin: 0 0 8px;
+      font-size: clamp(0.76rem, 3.1vw, 0.92rem);
+      line-height: 1.35;
+      color: rgba(255,255,255,0.82);
+    }
+
+    .word-input,
+    .rescue-btn {
+      width: 100%;
+      margin-top: 4px;
+      margin-bottom: 4px;
+      min-height: 40px;
+      font-size: 16px;
+    }
+
+    .word-input {
+      border: none;
+      border-radius: 8px;
+      outline: none;
+      padding: 0 12px;
+      background: rgba(255,255,255,0.92);
+      color: #111;
+      text-transform: uppercase;
+      box-shadow: inset 0 0 0 2px transparent;
+    }
+
+    .word-input:focus {
+      box-shadow: inset 0 0 0 2px rgba(47, 169, 255, 0.86);
+    }
+
+    .rescue-btn {
+      min-height: 44px;
+    }
+
+    .speech-bubble {
+      position: absolute;
+      top: -22px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.95);
+      color: #21304d;
+      font-size: 0.82rem;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.18);
+      animation: bubble-pop 1s ease forwards;
+      z-index: 2;
+    }
+
+    .sparkle {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      font-size: 1.25rem;
+      animation: sparkle-spin 0.75s ease forwards;
+      pointer-events: none;
+    }
+
+    .explode-mark {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2rem;
+      animation: boom 0.55s ease forwards;
+      pointer-events: none;
+    }
+
+    .failing {
+      animation: fail-card 0.42s ease forwards;
+    }
+
+    .rescuing {
+      animation: rocket-away 0.62s cubic-bezier(.22,.8,.24,1) forwards;
+    }
+
+    .bowing {
+      transform-origin: center bottom;
+      animation: alien-bow 0.72s ease;
+    }
+
+    .center-layer {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 6;
+      pointer-events: auto;
+    }
+
+    .overlay-panel {
+      width: min(100%, 440px);
+      background: rgba(15, 22, 52, 0.9);
+      border: 1px solid rgba(255,255,255,0.11);
+      border-radius: 24px;
+      padding: 24px 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .overlay-panel h1,
+    .overlay-panel h2 {
+      margin: 0 0 10px;
+      font-size: clamp(1.75rem, 7vw, 2.55rem);
+      color: #fff;
+    }
+
+    .overlay-panel h2 {
+      font-size: clamp(1.35rem, 6vw, 1.95rem);
+    }
+
+    .overlay-panel p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      line-height: 1.58;
+      font-size: clamp(0.96rem, 3.8vw, 1rem);
+    }
+
+    .hero-panel {
+      text-align: center;
+    }
+
+    .hero-panel p {
+      text-align: center;
+    }
+
+    .start-btn {
+      width: min(100%, 260px);
+      min-height: 60px;
+      font-size: clamp(1.1rem, 4vw, 1.25rem);
+    }
+
+    .guide-actions {
+      display: flex;
+      justify-content: flex-start;
+      gap: 10px;
+    }
+
+    .guide-close {
+      min-height: 46px;
+      padding: 0 22px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 16px;
+      z-index: 20;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-card {
+      width: min(100%, 420px);
+      background: #fff;
+      color: #18213d;
+      border-radius: 22px;
+      padding: 24px 20px;
+      text-align: center;
+      box-shadow: 0 22px 40px rgba(0, 0, 0, 0.35);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .modal-card h3 {
+      margin: 0 0 10px;
+      font-size: clamp(1.4rem, 6vw, 1.9rem);
+    }
+
+    .modal-card p {
+      margin: 0 0 16px;
+      font-size: 1rem;
+      color: #3d486f;
+      line-height: 1.5;
+    }
+
+    .modal-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .modal-card button {
+      width: 100%;
+      min-height: 52px;
+    }
+
+    .secondary-btn {
+      background: rgba(24, 33, 61, 0.08);
+      color: #18213d;
+      border: 1px solid rgba(24, 33, 61, 0.16);
+      box-shadow: none;
+    }
+
+    .tertiary-btn {
+      background: linear-gradient(180deg, #52d7b0 0%, #0fb282 100%);
+    }
+
+    .ufo-scene {
+      position: relative;
+      height: 160px;
+      margin-bottom: 14px;
+      overflow: hidden;
+      border-radius: 18px;
+      background:
+        radial-gradient(circle at center top, rgba(124, 180, 255, 0.22), transparent 46%),
+        linear-gradient(180deg, #101939 0%, #172952 100%);
+    }
+
+    .ufo {
+      position: absolute;
+      top: 12px;
+      left: -80px;
+      width: 88px;
+      height: 40px;
+      border-radius: 50% 50% 42% 42%;
+      background: linear-gradient(180deg, #eef8ff 0%, #cddaf4 100%);
+      box-shadow: 0 0 26px rgba(186, 222, 255, 0.36);
+      animation: ufo-fly 3.3s ease forwards;
+    }
+
+    .ufo::before {
+      content: "";
+      position: absolute;
+      left: 22px;
+      top: -12px;
+      width: 44px;
+      height: 22px;
+      border-radius: 50% 50% 42% 42%;
+      background: linear-gradient(180deg, #8df4ff 0%, #5bc8ef 100%);
+    }
+
+    .beam {
+      position: absolute;
+      top: 42px;
+      left: 22px;
+      width: 44px;
+      height: 92px;
+      background: linear-gradient(180deg, rgba(111, 244, 255, 0.56), rgba(111, 244, 255, 0.02));
+      clip-path: polygon(30% 0%, 70% 0%, 100% 100%, 0% 100%);
+      opacity: 0;
+      animation: beam-pulse 3.3s ease forwards;
+    }
+
+    .captured-alien {
+      position: absolute;
+      left: 38px;
+      top: 106px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 50% 35%, #9effb8 0%, #5bd58a 68%, #39b56c 100%);
+      animation: captured-up 3.3s ease forwards;
+    }
+
+    .captured-alien::before,
+    .captured-alien::after {
+      content: "";
+      position: absolute;
+      top: 8px;
+      width: 5px;
+      height: 8px;
+      background: #192039;
+      border-radius: 50%;
+    }
+
+    .captured-alien::before {
+      left: 7px;
+    }
+
+    .captured-alien::after {
+      right: 7px;
+    }
+
+    .victory-scene {
+      position: relative;
+      min-height: 170px;
+      margin-bottom: 12px;
+      border-radius: 18px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at center top, rgba(255,255,255,0.3), transparent 38%),
+        linear-gradient(180deg, #19386b 0%, #2b5aa1 100%);
+      padding: 18px 14px;
+    }
+
+    .elder-wrap {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 14px;
+      height: 100%;
+    }
+
+    .elder {
+      position: relative;
+      width: 82px;
+      height: 108px;
+      transform-origin: center bottom;
+      animation: elder-bow 1.3s ease infinite;
+    }
+
+    .elder-head {
+      width: 82px;
+      height: 62px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 50% 35%, #c7ffd8 0%, #74ea9f 70%, #4cbe74 100%);
+      box-shadow: 0 0 26px rgba(142, 255, 184, 0.24);
+    }
+
+    .elder-head::before,
+    .elder-head::after {
+      content: "";
+      position: absolute;
+      top: 20px;
+      width: 12px;
+      height: 16px;
+      background: #1c2442;
+      border-radius: 50%;
+    }
+
+    .elder-head::before {
+      left: 21px;
+      transform: rotate(16deg);
+    }
+
+    .elder-head::after {
+      right: 21px;
+      transform: rotate(-16deg);
+    }
+
+    .elder-body {
+      width: 54px;
+      height: 46px;
+      margin: -4px auto 0;
+      border-radius: 22px 22px 16px 16px;
+      background: linear-gradient(180deg, #b88cff 0%, #8c61ea 100%);
+    }
+
+    .elder-bubble {
+      max-width: 210px;
+      text-align: left;
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.95);
+      color: #28304f;
+      box-shadow: 0 12px 20px rgba(0,0,0,0.18);
+      font-weight: 700;
+      line-height: 1.45;
+      align-self: center;
+    }
+
+    .particle {
+      position: absolute;
+      pointer-events: none;
+      will-change: transform, opacity;
+      animation: particle-fall linear forwards;
+    }
+
+    .particle.star::before,
+    .particle.flower::before,
+    .particle.confetti::before {
+      content: attr(data-shape);
+      display: block;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%) translateY(8px);
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.65);
+      color: #fff;
+      font-size: 0.92rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 24;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (orientation: landscape) and (max-height: 560px) {
+      :root {
+        --game-height: 70vh;
+      }
+    }
+
+    @media (min-width: 680px) {
+      .lane {
+        grid-template-columns: repeat(3, minmax(150px, 1fr));
+      }
+    }
+
+    @media (max-width: 480px) {
+      .hud {
+        padding: 10px 12px;
+      }
+
+      .stat {
+        gap: 5px;
+      }
+
+      .toolbar {
+        justify-content: space-between;
+      }
+
+      .tool-btn {
+        flex: 1;
+      }
+
+      .modal-actions {
+        grid-template-columns: 1fr;
+      }
+
+      .elder-wrap {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .elder-bubble {
+        text-align: center;
+      }
+    }
+
+    @keyframes twinkle {
+      from { opacity: 0.56; }
+      to { opacity: 1; }
+    }
+
+    @keyframes drift {
+      from { transform: translateX(-8%); }
+      to { transform: translateX(8%); }
+    }
+
+    @keyframes spawn {
+      from { opacity: 0; transform: scale(0.94); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes alien-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+
+    @keyframes rocket-away {
+      0% { opacity: 1; transform: translate3d(var(--tx, 0px), var(--ty, 0px), 0) scale(1); }
+      25% { transform: translate3d(var(--tx, 0px), calc(var(--ty, 0px) - 18px), 0) scale(1.04); }
+      100% { opacity: 0; transform: translate3d(var(--tx, 0px), calc(var(--ty, 0px) - 220px), 0) scale(0.85) rotate(-8deg); }
+    }
+
+    @keyframes fail-card {
+      0% { opacity: 1; }
+      15% { transform: translate3d(var(--tx, 0px), var(--ty, 0px), 0) translateX(-7px); }
+      30% { transform: translate3d(var(--tx, 0px), var(--ty, 0px), 0) translateX(7px); }
+      45% { transform: translate3d(var(--tx, 0px), var(--ty, 0px), 0) translateX(-6px); }
+      100% { opacity: 0; transform: translate3d(var(--tx, 0px), calc(var(--ty, 0px) + 85px), 0) scale(0.86) rotate(8deg); filter: saturate(0.5); }
+    }
+
+    @keyframes bubble-pop {
+      0% { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.85); }
+      16% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+      85% { opacity: 1; }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.95); }
+    }
+
+    @keyframes sparkle-spin {
+      0% { opacity: 0; transform: scale(0.3) rotate(-40deg); }
+      30% { opacity: 1; transform: scale(1.15) rotate(14deg); }
+      100% { opacity: 0; transform: scale(1.7) rotate(80deg); }
+    }
+
+    @keyframes boom {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+      20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(1.65); }
+    }
+
+    @keyframes screen-shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-6px); }
+      40% { transform: translateX(6px); }
+      60% { transform: translateX(-4px); }
+      80% { transform: translateX(4px); }
+    }
+
+    @keyframes alien-bow {
+      0% { transform: rotateX(0deg); }
+      35% { transform: rotateX(20deg) scaleY(0.98); }
+      100% { transform: rotateX(0deg); }
+    }
+
+    @keyframes particle-fall {
+      0% { opacity: 1; transform: translate3d(var(--x, 0px), var(--y, 0px), 0) rotate(0deg) scale(1); }
+      100% { opacity: 0; transform: translate3d(calc(var(--x, 0px) + var(--drift, 0px)), calc(var(--y, 0px) + var(--drop, 220px)), 0) rotate(var(--rot, 360deg)) scale(0.6); }
+    }
+
+    @keyframes ufo-fly {
+      0% { transform: translateX(0) translateY(0); }
+      35% { transform: translateX(155px) translateY(0); }
+      100% { transform: translateX(420px) translateY(-8px); }
+    }
+
+    @keyframes beam-pulse {
+      0%, 18% { opacity: 0; }
+      25%, 70% { opacity: 0.9; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes captured-up {
+      0%, 18% { transform: translateY(0) scale(1); opacity: 1; }
+      55% { transform: translateY(-52px) scale(0.95); opacity: 1; }
+      100% { transform: translateY(-94px) scale(0.78); opacity: 0; }
+    }
+
+    @keyframes elder-bow {
+      0%, 100% { transform: rotateX(0deg); }
+      32% { transform: rotateX(18deg); }
+      70% { transform: rotateX(0deg); }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="hud" aria-label="游戏状态">
+      <div class="stat">
+        <small>分数</small>
+        <span class="score-value" id="scoreValue">0</span>
+      </div>
+      <div class="stat lives" aria-live="polite">
+        <small>生命</small>
+        <span id="livesValue">❤️❤️❤️</span>
+      </div>
+      <div class="stat best" id="bestBox" title="长按这里重置最高分">
+        <small>最高分</small>
+        <span class="best-value" id="bestValue">0</span>
+      </div>
+    </section>
+
+    <div class="toolbar">
+      <button type="button" class="icon-toggle" id="soundToggle" aria-label="关闭音效" title="音效开启">
+        <svg class="sound-svg" viewBox="0 0 64 64" aria-hidden="true">
+          <path class="speaker-fill" d="M14 24H26L40 13V51L26 40H14C11.8 40 10 38.2 10 36V28C10 25.8 11.8 24 14 24Z"></path>
+          <path class="sound-wave" d="M46 23C49.5 26 51.5 29.5 51.5 32C51.5 34.5 49.5 38 46 41"></path>
+          <path class="sound-wave" d="M51 17C56.5 21.8 59 27 59 32C59 37 56.5 42.2 51 47"></path>
+          <path class="sound-slash" d="M14 50L54 14"></path>
+        </svg>
+        <span class="sr-only">音效开关</span>
+      </button>
+      <button type="button" class="tool-btn" id="pauseToggle" disabled>暂停</button>
+    </div>
+
+    <section class="game-shell">
+      <div class="game-area" id="gameArea" aria-label="外星人单词救援游戏区域">
+        <div class="grid-overlay" aria-hidden="true"></div>
+        <div class="lane" id="lane" aria-live="polite"></div>
+        <div class="effect-layer" id="effectLayer" aria-hidden="true"></div>
+
+        <div class="center-layer" id="startLayer">
+          <div class="overlay-panel hero-panel">
+            <h1>外星人单词救援</h1>
+            <p>你是“星际翻译官”。外星飞船因语言能量枯竭而坠落，快输入正确单词，为每位外星人补充能量，让它们安全返回母舰。</p>
+            <button type="button" class="start-btn" id="startButton">开始游戏</button>
+          </div>
+        </div>
+
+        <div class="center-layer hidden" id="guideLayer">
+          <div class="overlay-panel">
+            <h2>玩法说明</h2>
+            <p>每张卡片都代表一位等待救援的外星人。请在对应输入框中输入相同的 3 字母单词，点击“救援”或直接按回车。</p>
+            <p>输入不区分大小写。救援成功得 10 分；单词落地会失去 1 条生命。达到 300 分时会触发营救成功结局。</p>
+            <div class="guide-actions">
+              <button type="button" class="guide-close" id="guideClose">知道了</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal" id="gameOverModal" role="dialog" aria-modal="true" aria-labelledby="gameOverTitle">
+    <div class="modal-card">
+      <div class="ufo-scene" aria-hidden="true">
+        <div class="ufo">
+          <div class="beam"></div>
+          <div class="captured-alien"></div>
+        </div>
+      </div>
+      <h3 id="gameOverTitle">游戏结束</h3>
+      <p id="gameOverStory">外星人未获救……被敌方捕获了 😭</p>
+      <p id="finalScoreText">最终分数：0</p>
+      <div class="modal-actions">
+        <button type="button" id="restartButton">重新开始</button>
+        <button type="button" class="secondary-btn" id="exitButton">结束</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="victoryModal" role="dialog" aria-modal="true" aria-labelledby="victoryTitle">
+    <div class="modal-card">
+      <div class="victory-scene" id="victoryScene" aria-hidden="true">
+        <div class="elder-wrap">
+          <div class="elder">
+            <div class="elder-head"></div>
+            <div class="elder-body"></div>
+          </div>
+          <div class="elder-bubble">Thanks to you, we can go home! 🎉</div>
+        </div>
+      </div>
+      <h3 id="victoryTitle">营救成功</h3>
+      <p>外星人长老向你鞠躬致谢，母舰已经重新启动。</p>
+      <p id="victoryScoreText">最终分数：0</p>
+      <div class="modal-actions">
+        <button type="button" id="victoryRestartButton">再玩一次</button>
+        <button type="button" class="tertiary-btn" id="infiniteButton">继续无限挑战</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">最高分已重置</div>
+
+  <script>
+    (() => {
+      const CONSONANTS = "BCDFGHJKLMNPQRSTVWXYZ";
+      const VOWELS = "AEIOU";
+      const SCORE_PER_SAVE = 10;
+      const BASE_SPAWN_INTERVAL = 1500;
+      const MIN_SPAWN_INTERVAL = 600;
+      const BASE_SPEED_PX_PER_SEC = 40;
+      const MAX_SPEED_PX_PER_FRAME = 8;
+      const BASE_MAX_WORDS = 3;
+      const WIN_SCORE = 300;
+      const STORAGE_KEY = "alien-word-rescue-best";
+      const PARTICLE_SHAPES = ["✨", "⭐", "🌸", "💫", "🪐"];
+
+      const refs = {
+        body: document.body,
+        gameArea: document.getElementById("gameArea"),
+        lane: document.getElementById("lane"),
+        effectLayer: document.getElementById("effectLayer"),
+        scoreValue: document.getElementById("scoreValue"),
+        livesValue: document.getElementById("livesValue"),
+        bestValue: document.getElementById("bestValue"),
+        startLayer: document.getElementById("startLayer"),
+        guideLayer: document.getElementById("guideLayer"),
+        startButton: document.getElementById("startButton"),
+        guideClose: document.getElementById("guideClose"),
+        pauseToggle: document.getElementById("pauseToggle"),
+        soundToggle: document.getElementById("soundToggle"),
+        gameOverModal: document.getElementById("gameOverModal"),
+        victoryModal: document.getElementById("victoryModal"),
+        finalScoreText: document.getElementById("finalScoreText"),
+        victoryScoreText: document.getElementById("victoryScoreText"),
+        restartButton: document.getElementById("restartButton"),
+        exitButton: document.getElementById("exitButton"),
+        victoryRestartButton: document.getElementById("victoryRestartButton"),
+        infiniteButton: document.getElementById("infiniteButton"),
+        bestBox: document.getElementById("bestBox"),
+        toast: document.getElementById("toast")
+      };
+
+      const state = {
+        playing: false,
+        paused: false,
+        score: 0,
+        lives: 3,
+        bestScore: Number(localStorage.getItem(STORAGE_KEY) || 0),
+        words: [],
+        animationId: 0,
+        lastFrameTime: 0,
+        spawnAccumulator: 0,
+        recentWords: [],
+        recentWordSet: new Set(),
+        soundEnabled: true,
+        audioContext: null,
+        longPressTimer: 0,
+        toastTimer: 0,
+        victoryTriggered: false,
+        infiniteMode: false,
+        spawnLocked: false
+      };
+
+      function init() {
+        updateHud();
+        bindEvents();
+        updatePauseButton();
+        updateSoundUi();
+        layoutWords();
+      }
+
+      function bindEvents() {
+        refs.startButton.addEventListener("click", openGuide);
+        refs.guideClose.addEventListener("click", startGame);
+        refs.restartButton.addEventListener("click", restartGame);
+        refs.exitButton.addEventListener("click", exitToMenu);
+        refs.victoryRestartButton.addEventListener("click", restartGame);
+        refs.infiniteButton.addEventListener("click", continueInfiniteMode);
+        refs.pauseToggle.addEventListener("click", togglePause);
+        refs.soundToggle.addEventListener("click", toggleSound);
+
+        window.addEventListener("resize", () => {
+          layoutWords();
+          const activeInput = document.activeElement;
+          if (activeInput && activeInput.classList && activeInput.classList.contains("word-input")) {
+            requestAnimationFrame(() => keepInputVisible(activeInput));
+          }
+        });
+
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden && state.playing && !state.paused) {
+            state.paused = true;
+            updatePauseButton();
+          }
+        });
+
+        const startPress = () => {
+          clearTimeout(state.longPressTimer);
+          state.longPressTimer = window.setTimeout(() => {
+            localStorage.removeItem(STORAGE_KEY);
+            state.bestScore = 0;
+            updateHud();
+            showToast("最高分已重置");
+          }, 750);
+        };
+
+        const cancelPress = () => clearTimeout(state.longPressTimer);
+
+        refs.bestBox.addEventListener("mousedown", startPress);
+        refs.bestBox.addEventListener("touchstart", startPress, { passive: true });
+        refs.bestBox.addEventListener("mouseup", cancelPress);
+        refs.bestBox.addEventListener("mouseleave", cancelPress);
+        refs.bestBox.addEventListener("touchend", cancelPress);
+        refs.bestBox.addEventListener("touchcancel", cancelPress);
+      }
+
+      function openGuide() {
+        refs.startLayer.classList.add("hidden");
+        refs.guideLayer.classList.remove("hidden");
+      }
+
+      function startGame() {
+        resetState();
+        refs.startLayer.classList.add("hidden");
+        refs.guideLayer.classList.add("hidden");
+        refs.gameOverModal.classList.remove("show");
+        refs.victoryModal.classList.remove("show");
+        state.playing = true;
+        state.paused = false;
+        refs.pauseToggle.disabled = false;
+        updatePauseButton();
+        state.lastFrameTime = performance.now();
+        ensureMinimumWords();
+        state.animationId = requestAnimationFrame(gameLoop);
+      }
+
+      function restartGame() {
+        refs.gameOverModal.classList.remove("show");
+        refs.victoryModal.classList.remove("show");
+        startGame();
+      }
+
+      function continueInfiniteMode() {
+        refs.victoryModal.classList.remove("show");
+        refs.body.classList.remove("victory-mode");
+        refs.gameArea.classList.remove("victory-bg");
+        state.infiniteMode = true;
+        state.victoryTriggered = false;
+        state.spawnLocked = false;
+        state.playing = true;
+        state.paused = false;
+        refs.pauseToggle.disabled = false;
+        updatePauseButton();
+        ensureMinimumWords();
+        state.lastFrameTime = performance.now();
+        state.animationId = requestAnimationFrame(gameLoop);
+      }
+
+      function exitToMenu() {
+        state.playing = false;
+        state.paused = false;
+        refs.pauseToggle.disabled = true;
+        updatePauseButton();
+        cancelAnimationFrame(state.animationId);
+        refs.gameOverModal.classList.remove("show");
+        refs.victoryModal.classList.remove("show");
+        refs.guideLayer.classList.add("hidden");
+        refs.startLayer.classList.remove("hidden");
+        resetState();
+      }
+
+      function resetState() {
+        cancelAnimationFrame(state.animationId);
+        state.score = 0;
+        state.lives = 3;
+        state.spawnAccumulator = 0;
+        state.lastFrameTime = 0;
+        state.recentWords = [];
+        state.recentWordSet.clear();
+        state.victoryTriggered = false;
+        state.infiniteMode = false;
+        state.spawnLocked = false;
+        refs.body.classList.remove("victory-mode", "failure-mode");
+        refs.gameArea.classList.remove("victory-bg", "hit-shake");
+        state.words.forEach(word => removeWord(word, true));
+        state.words = [];
+        refs.effectLayer.innerHTML = "";
+        updateHud();
+      }
+
+      function gameLoop(timestamp) {
+        if (!state.playing) return;
+
+        if (state.paused) {
+          state.lastFrameTime = timestamp;
+          state.animationId = requestAnimationFrame(gameLoop);
+          return;
+        }
+
+        const delta = Math.min(50, timestamp - state.lastFrameTime || 16.67);
+        state.lastFrameTime = timestamp;
+
+        updateWords(delta);
+        if (!state.spawnLocked) {
+          maybeSpawnWord(delta);
+          ensureMinimumWords();
+        }
+        checkVictory();
+
+        state.animationId = requestAnimationFrame(gameLoop);
+      }
+
+      function updateWords(delta) {
+        const speedPerSec = getCurrentSpeedPxPerSec();
+        const areaHeight = refs.gameArea.clientHeight;
+        const bottomPadding = 12;
+        const wordsSnapshot = [...state.words];
+
+        for (const word of wordsSnapshot) {
+          word.y += speedPerSec * (delta / 1000);
+          syncWordPosition(word);
+
+          if (!state.victoryTriggered && word.y + word.height >= areaHeight - bottomPadding) {
+            handleWordMiss(word);
+          }
+        }
+      }
+
+      function maybeSpawnWord(delta) {
+        state.spawnAccumulator += delta;
+        const interval = getCurrentSpawnInterval();
+
+        while (state.spawnAccumulator >= interval) {
+          state.spawnAccumulator -= interval;
+          if (state.words.length < getCurrentMaxWords()) {
+            spawnWord();
+          } else {
+            break;
+          }
+        }
+      }
+
+      function ensureMinimumWords() {
+        if (state.spawnLocked) return;
+        const targetCount = Math.min(2, getCurrentMaxWords());
+        const missingCount = Math.max(0, targetCount - state.words.length);
+
+        for (let i = 0; state.playing && !state.paused && i < missingCount; i += 1) {
+          spawnWord();
+        }
+      }
+
+      function getCurrentSpeedPxPerSec() {
+        const levelBoost = Math.floor(state.score / 50);
+        const increased = BASE_SPEED_PX_PER_SEC * Math.pow(1.1, levelBoost);
+        return Math.min(increased, MAX_SPEED_PX_PER_FRAME * 60);
+      }
+
+      function getCurrentSpawnInterval() {
+        const reduction = Math.floor(state.score / 100) * 100;
+        return Math.max(MIN_SPAWN_INTERVAL, BASE_SPAWN_INTERVAL - reduction);
+      }
+
+      function getCurrentMaxWords() {
+        return BASE_MAX_WORDS + Math.floor(state.score / 100);
+      }
+
+      function randomItem(str) {
+        return str[Math.floor(Math.random() * str.length)];
+      }
+
+      function generateWord() {
+        let attempts = 0;
+        let word = "";
+
+        do {
+          word = `${randomItem(CONSONANTS)}${randomItem(VOWELS)}${randomItem(CONSONANTS)}`;
+          attempts += 1;
+        } while (state.recentWordSet.has(word) && attempts < 40);
+
+        rememberWord(word);
+        return word;
+      }
+
+      function sanitizeInputValue(value) {
+        return String(value).toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3);
+      }
+
+      function rememberWord(word) {
+        state.recentWords.push(word);
+        state.recentWordSet.add(word);
+        if (state.recentWords.length > 30) {
+          const removed = state.recentWords.shift();
+          state.recentWordSet.delete(removed);
+        }
+      }
+
+      function getWordHint(text) {
+        const onsetMap = {
+          B: "布", C: "克", D: "德", F: "夫", G: "格", H: "哈", J: "杰", K: "克",
+          L: "勒", M: "姆", N: "恩", P: "普", Q: "库", R: "若", S: "斯", T: "特",
+          V: "维", W: "瓦", X: "克斯", Y: "耶", Z: "泽"
+        };
+        const vowelMap = { A: "啊", E: "诶", I: "衣", O: "哦", U: "呜" };
+        const endingMap = {
+          B: "布", C: "克", D: "德", F: "夫", G: "格", H: "赫", J: "吉", K: "克",
+          L: "勒", M: "姆", N: "恩", P: "普", Q: "库", R: "尔", S: "斯", T: "特",
+          V: "夫", W: "乌", X: "克斯", Y: "伊", Z: "兹"
+        };
+
+        return `拼读提示：${onsetMap[text[0]]}-${vowelMap[text[1]]}-${endingMap[text[2]]}`;
+      }
+
+      function spawnWord() {
+        const card = createWordCard(generateWord());
+        refs.lane.appendChild(card.element);
+        const { x, width, height } = pickWordPosition(card.element);
+        card.x = x;
+        card.y = 0;
+        card.width = width;
+        card.height = height;
+        syncWordPosition(card);
+        state.words.push(card);
+      }
+
+      function createWordCard(text) {
+        const element = document.createElement("article");
+        element.className = "word-card";
+        element.setAttribute("data-word", text);
+        const inputId = `input-${text}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        element.innerHTML = `
+          <div class="card-head">
+            <div class="alien-avatar" aria-hidden="true"></div>
+            <div class="word-block">
+              <div class="alien-label">等待能量补给的外星人</div>
+              <h3 class="word-text">${text}</h3>
+            </div>
+          </div>
+          <p class="word-hint">${getWordHint(text)}</p>
+          <label class="sr-only" for="${inputId}">输入 ${text}</label>
+          <input id="${inputId}" class="word-input" type="text" maxlength="3" inputmode="text" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" placeholder="输入单词">
+          <button type="button" class="rescue-btn">救援</button>
+        `;
+
+        const input = element.querySelector(".word-input");
+        const button = element.querySelector(".rescue-btn");
+
+        const wordObj = {
+          text,
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0,
+          element,
+          input,
+          button,
+          removing: false
+        };
+
+        button.addEventListener("click", () => rescueWord(wordObj));
+        input.addEventListener("keydown", event => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            rescueWord(wordObj);
+          }
+        });
+        input.addEventListener("blur", () => {
+          input.value = sanitizeInputValue(input.value);
+        });
+        input.addEventListener("focus", () => {
+          setTimeout(() => keepInputVisible(input), 120);
+        });
+
+        return wordObj;
+      }
+
+      function pickWordPosition(element) {
+        const areaWidth = refs.gameArea.clientWidth;
+        const lanes = window.matchMedia("(min-width: 680px)").matches ? 3 : 2;
+        const laneGap = 10;
+        const padding = 10;
+        const width = Math.min(250, Math.max(150, Math.floor((areaWidth - padding * 2 - laneGap * (lanes - 1)) / lanes)));
+        const laneWidth = width + laneGap;
+        const activeLaneIndexes = new Set();
+
+        for (const word of state.words) {
+          const laneIndex = Math.round((word.x - padding) / laneWidth);
+          activeLaneIndexes.add(Math.max(0, Math.min(lanes - 1, laneIndex)));
+        }
+
+        const available = [];
+        for (let i = 0; i < lanes; i += 1) {
+          if (!activeLaneIndexes.has(i)) available.push(i);
+        }
+
+        const pool = available.length ? available : Array.from({ length: lanes }, (_, i) => i);
+        const laneIndex = pool[Math.floor(Math.random() * pool.length)];
+        const x = padding + laneIndex * laneWidth;
+
+        element.style.width = `${width}px`;
+        return {
+          x,
+          width,
+          height: element.offsetHeight || 192
+        };
+      }
+
+      function syncWordPosition(word) {
+        word.element.style.setProperty("--tx", `${word.x}px`);
+        word.element.style.setProperty("--ty", `${word.y}px`);
+        word.element.style.transform = `translate3d(${word.x}px, ${word.y}px, 0)`;
+      }
+
+      function rescueWord(word) {
+        if (!state.playing || state.paused || word.removing || state.victoryTriggered) return;
+
+        const value = sanitizeInputValue(word.input.value);
+        word.input.value = value;
+        if (value !== word.text) {
+          word.input.focus();
+          word.input.select();
+          return;
+        }
+
+        word.removing = true;
+        state.score += SCORE_PER_SAVE;
+        if (state.score > state.bestScore) {
+          state.bestScore = state.score;
+          localStorage.setItem(STORAGE_KEY, String(state.bestScore));
+        }
+        updateHud();
+
+        addBubble(word.element, "Thanks! 👽");
+        addSparkle(word.element);
+        word.element.classList.add("success-glow", "rescuing");
+        createParticleBurst(word.x + word.width / 2, word.y + 20, 10, false);
+        playSuccessSound();
+
+        window.setTimeout(() => removeWord(word), 620);
+        checkVictory();
+      }
+
+      function handleWordMiss(word) {
+        if (word.removing || state.victoryTriggered) return;
+
+        word.removing = true;
+        state.lives = Math.max(0, state.lives - 1);
+        updateHud();
+        addBubble(word.element, "Oh no... 🥀");
+        addExplosion(word.element);
+        word.element.classList.add("fail-glow", "failing");
+        screenShake();
+        playFailSound();
+        createParticleBurst(word.x + word.width / 2, word.y + word.height / 2, 8, true);
+
+        window.setTimeout(() => removeWord(word), 420);
+
+        if (state.lives <= 0) {
+          window.setTimeout(endGame, 430);
+        }
+      }
+
+      function removeWord(word, immediate = false) {
+        word.removing = true;
+        const index = state.words.indexOf(word);
+        if (index >= 0) {
+          state.words.splice(index, 1);
+        }
+
+        if (word.element && word.element.parentNode) {
+          word.element.parentNode.removeChild(word.element);
+        }
+
+        if (!immediate && state.playing && !state.paused && !state.spawnLocked) {
+          ensureMinimumWords();
+        }
+      }
+
+      function addBubble(container, text) {
+        const bubble = document.createElement("div");
+        bubble.className = "speech-bubble";
+        bubble.textContent = text;
+        container.appendChild(bubble);
+        window.setTimeout(() => bubble.remove(), 1000);
+      }
+
+      function addSparkle(container) {
+        const sparkle = document.createElement("div");
+        sparkle.className = "sparkle";
+        sparkle.textContent = "✨";
+        container.appendChild(sparkle);
+        window.setTimeout(() => sparkle.remove(), 800);
+      }
+
+      function addExplosion(container) {
+        const boom = document.createElement("div");
+        boom.className = "explode-mark";
+        boom.textContent = "💥";
+        container.appendChild(boom);
+        window.setTimeout(() => boom.remove(), 580);
+      }
+
+      function createParticleBurst(x, y, count, failureMode) {
+        const areaRect = refs.gameArea.getBoundingClientRect();
+        const localX = x;
+        const localY = y;
+
+        for (let i = 0; i < count; i += 1) {
+          const particle = document.createElement("div");
+          particle.className = `particle ${failureMode ? "confetti" : (i % 2 ? "star" : "flower")}`;
+          particle.dataset.shape = failureMode ? (i % 2 ? "✦" : "💥") : PARTICLE_SHAPES[i % PARTICLE_SHAPES.length];
+          const drift = Math.floor(Math.random() * 140 - 70);
+          const drop = Math.floor(Math.random() * 110 + (failureMode ? 70 : 120));
+          const duration = (Math.random() * 0.7 + 0.8).toFixed(2);
+          const rotation = Math.floor(Math.random() * 500 - 250);
+          const size = Math.floor(Math.random() * 12 + 14);
+
+          particle.style.left = `${localX}px`;
+          particle.style.top = `${localY}px`;
+          particle.style.fontSize = `${size}px`;
+          particle.style.color = failureMode
+            ? ["#ff8a92", "#ffd05a", "#ffd9df"][i % 3]
+            : ["#fff37f", "#ffd1f5", "#9fffe4", "#ffd8a0"][i % 4];
+          particle.style.setProperty("--x", "0px");
+          particle.style.setProperty("--y", "0px");
+          particle.style.setProperty("--drift", `${drift}px`);
+          particle.style.setProperty("--drop", `${drop}px`);
+          particle.style.setProperty("--rot", `${rotation}deg`);
+          particle.style.animationDuration = `${duration}s`;
+
+          refs.effectLayer.appendChild(particle);
+          window.setTimeout(() => particle.remove(), duration * 1000 + 120);
+        }
+      }
+
+      function createConfettiRain(count) {
+        for (let i = 0; i < count; i += 1) {
+          const particle = document.createElement("div");
+          particle.className = `particle ${i % 3 === 0 ? "flower" : (i % 2 ? "star" : "confetti")}`;
+          particle.dataset.shape = PARTICLE_SHAPES[i % PARTICLE_SHAPES.length];
+          const x = Math.random() * refs.gameArea.clientWidth;
+          const drift = Math.floor(Math.random() * 180 - 90);
+          const drop = Math.floor(Math.random() * 260 + 180);
+          const duration = (Math.random() * 1.1 + 1.8).toFixed(2);
+          const rotation = Math.floor(Math.random() * 720 - 360);
+          const size = Math.floor(Math.random() * 12 + 12);
+
+          particle.style.left = `${x}px`;
+          particle.style.top = "-10px";
+          particle.style.fontSize = `${size}px`;
+          particle.style.color = ["#fff37f", "#ffbce6", "#9fffe4", "#ffd89d", "#b8c8ff"][i % 5];
+          particle.style.setProperty("--x", "0px");
+          particle.style.setProperty("--y", "0px");
+          particle.style.setProperty("--drift", `${drift}px`);
+          particle.style.setProperty("--drop", `${drop}px`);
+          particle.style.setProperty("--rot", `${rotation}deg`);
+          particle.style.animationDuration = `${duration}s`;
+
+          refs.effectLayer.appendChild(particle);
+          window.setTimeout(() => particle.remove(), duration * 1000 + 180);
+        }
+      }
+
+      function screenShake() {
+        refs.gameArea.classList.remove("hit-shake");
+        void refs.gameArea.offsetWidth;
+        refs.gameArea.classList.add("hit-shake");
+        window.setTimeout(() => refs.gameArea.classList.remove("hit-shake"), 340);
+      }
+
+      function checkVictory() {
+        if (state.infiniteMode || state.victoryTriggered || state.score < WIN_SCORE) return;
+        triggerVictory();
+      }
+
+      function triggerVictory() {
+        state.victoryTriggered = true;
+        state.spawnLocked = true;
+        state.playing = false;
+        state.paused = false;
+        refs.pauseToggle.disabled = true;
+        updatePauseButton();
+        cancelAnimationFrame(state.animationId);
+        refs.body.classList.add("victory-mode");
+        refs.gameArea.classList.add("victory-bg");
+
+        const currentWords = [...state.words];
+        currentWords.forEach((word, index) => {
+          if (word.removing) return;
+          word.removing = true;
+          word.element.classList.add("bowing");
+          window.setTimeout(() => {
+            addBubble(word.element, "Mission complete! ✨");
+          }, index * 140);
+          window.setTimeout(() => removeWord(word), 900 + index * 120);
+        });
+
+        createConfettiRain(42);
+        playVictorySound();
+
+        window.setTimeout(() => {
+          refs.victoryScoreText.textContent = `最终分数：${state.score}`;
+          refs.victoryModal.classList.add("show");
+        }, 1100);
+      }
+
+      function endGame() {
+        if (!state.playing && !state.words.length) return;
+        state.playing = false;
+        state.paused = false;
+        state.spawnLocked = true;
+        refs.pauseToggle.disabled = true;
+        updatePauseButton();
+        cancelAnimationFrame(state.animationId);
+        refs.body.classList.add("failure-mode");
+        refs.finalScoreText.textContent = `最终分数：${state.score}`;
+        refs.gameOverModal.classList.add("show");
+        playGameOverSound();
+      }
+
+      function togglePause() {
+        if (!state.playing) return;
+        state.paused = !state.paused;
+        updatePauseButton();
+      }
+
+      function updatePauseButton() {
+        refs.pauseToggle.textContent = state.paused ? "继续" : "暂停";
+      }
+
+      function toggleSound() {
+        state.soundEnabled = !state.soundEnabled;
+        updateSoundUi();
+      }
+
+      function updateSoundUi() {
+        refs.soundToggle.classList.toggle("muted", !state.soundEnabled);
+        refs.soundToggle.setAttribute("aria-label", state.soundEnabled ? "关闭音效" : "开启音效");
+        refs.soundToggle.setAttribute("title", state.soundEnabled ? "音效开启" : "音效关闭");
+      }
+
+      function updateHud() {
+        refs.scoreValue.textContent = String(state.score);
+        refs.bestValue.textContent = String(state.bestScore);
+        refs.livesValue.textContent = "❤️".repeat(state.lives) || "—";
+      }
+
+      function layoutWords() {
+        const words = [...state.words];
+        for (const word of words) {
+          const position = pickWordPosition(word.element);
+          word.x = position.x;
+          word.width = position.width;
+          word.height = word.element.offsetHeight || position.height;
+          syncWordPosition(word);
+        }
+      }
+
+      function showToast(message) {
+        refs.toast.textContent = message;
+        refs.toast.classList.add("show");
+        clearTimeout(state.toastTimer);
+        state.toastTimer = window.setTimeout(() => {
+          refs.toast.classList.remove("show");
+        }, 1600);
+      }
+
+      function keepInputVisible(input) {
+        if (!input) return;
+
+        if (typeof input.scrollIntoViewIfNeeded === "function") {
+          input.scrollIntoViewIfNeeded(false);
+        } else {
+          input.scrollIntoView({
+            block: "nearest",
+            inline: "nearest",
+            behavior: "smooth"
+          });
+        }
+      }
+
+      function getAudioContext() {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return null;
+        if (!state.audioContext) {
+          state.audioContext = new AudioContextClass();
+        }
+        if (state.audioContext.state === "suspended") {
+          state.audioContext.resume().catch(() => {});
+        }
+        return state.audioContext;
+      }
+
+      function playToneSequence(steps, wave = "triangle") {
+        if (!state.soundEnabled) return;
+        const ctx = getAudioContext();
+        if (!ctx) return;
+
+        let cursor = ctx.currentTime;
+        steps.forEach(step => {
+          const oscillator = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+          oscillator.type = wave;
+          oscillator.frequency.setValueAtTime(step.freq, cursor);
+          gainNode.gain.setValueAtTime(0.0001, cursor);
+          gainNode.gain.exponentialRampToValueAtTime(step.gain || 0.09, cursor + 0.01);
+          gainNode.gain.exponentialRampToValueAtTime(0.0001, cursor + step.duration);
+          oscillator.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          oscillator.start(cursor);
+          oscillator.stop(cursor + step.duration);
+          cursor += step.duration * 0.75;
+        });
+      }
+
+      function playSuccessSound() {
+        playToneSequence([
+          { freq: 620, duration: 0.08, gain: 0.08 },
+          { freq: 740, duration: 0.09, gain: 0.08 },
+          { freq: 920, duration: 0.12, gain: 0.1 }
+        ], "triangle");
+      }
+
+      function playFailSound() {
+        playToneSequence([
+          { freq: 180, duration: 0.12, gain: 0.1 },
+          { freq: 130, duration: 0.16, gain: 0.08 }
+        ], "sine");
+      }
+
+      function playVictorySound() {
+        playToneSequence([
+          { freq: 523, duration: 0.1, gain: 0.08 },
+          { freq: 659, duration: 0.1, gain: 0.08 },
+          { freq: 784, duration: 0.13, gain: 0.09 },
+          { freq: 1046, duration: 0.18, gain: 0.1 }
+        ], "triangle");
+      }
+
+      function playGameOverSound() {
+        playToneSequence([
+          { freq: 392, duration: 0.14, gain: 0.08 },
+          { freq: 330, duration: 0.16, gain: 0.08 },
+          { freq: 262, duration: 0.2, gain: 0.09 }
+        ], "sine");
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>
