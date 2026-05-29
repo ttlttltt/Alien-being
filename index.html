@@ -18,7 +18,7 @@
       --gold: #ffd85a;
       --danger: #ff6677;
       --success: #6cffbf;
-      --game-height: 78vh;
+      --game-height: 80vh;
       --header-size: clamp(1.05rem, 6vw, 1.55rem);
       --shadow: 0 18px 36px rgba(0, 0, 0, 0.3);
       --base-font: "Trebuchet MS", "Segoe UI", sans-serif;
@@ -299,8 +299,8 @@
 
     .word-card {
       position: absolute;
-      width: min(100%, 250px);
-      min-width: 150px;
+      width: min(100%, 240px);
+      min-width: 142px;
       background:
         radial-gradient(circle at top right, rgba(149, 253, 206, 0.2), transparent 38%),
         radial-gradient(circle at top left, rgba(181, 136, 255, 0.18), transparent 35%),
@@ -308,7 +308,7 @@
       border: 1px solid rgba(162, 235, 205, 0.22);
       border-radius: 18px;
       box-shadow: 0 18px 28px rgba(0, 0, 0, 0.28), 0 0 24px rgba(124, 255, 182, 0.08);
-      padding: 12px;
+      padding: 10px;
       pointer-events: auto;
       will-change: transform;
       animation: spawn 0.26s ease;
@@ -336,9 +336,9 @@
 
     .alien-avatar {
       position: relative;
-      width: 44px;
-      height: 44px;
-      min-width: 44px;
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
       border-radius: 50%;
       background:
         radial-gradient(circle at 50% 36%, #9effb8 0%, #5bd58a 68%, #39b56c 100%);
@@ -381,7 +381,7 @@
     .word-text {
       margin: 0 0 4px;
       font-family: var(--display-font);
-      font-size: clamp(1.45rem, 6.2vw, 1.9rem);
+      font-size: clamp(1.28rem, 5.6vw, 1.75rem);
       letter-spacing: 0.12em;
       color: #fff;
       text-shadow: 0 0 12px rgba(255,255,255,0.2);
@@ -814,6 +814,10 @@
     }
 
     @media (max-width: 480px) {
+      :root {
+        --game-height: 82vh;
+      }
+
       .hud {
         padding: 10px 12px;
       }
@@ -841,6 +845,66 @@
 
       .elder-bubble {
         text-align: center;
+      }
+
+      .lane {
+        gap: 8px;
+        padding: 8px;
+      }
+
+      .word-card {
+        min-width: 132px;
+        border-radius: 16px;
+        padding: 9px;
+      }
+
+      .card-head {
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+
+      .alien-avatar {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+      }
+
+      .alien-avatar::before,
+      .alien-avatar::after {
+        top: 11px;
+        width: 8px;
+        height: 11px;
+      }
+
+      .alien-avatar::before {
+        left: 9px;
+      }
+
+      .alien-avatar::after {
+        right: 9px;
+      }
+
+      .alien-label {
+        font-size: 0.7rem;
+      }
+
+      .word-text {
+        font-size: 1.15rem;
+        letter-spacing: 0.08em;
+      }
+
+      .word-hint {
+        font-size: 0.72rem;
+        margin-bottom: 6px;
+      }
+
+      .word-input,
+      .rescue-btn {
+        min-height: 38px;
+      }
+
+      .rescue-btn {
+        min-height: 40px;
       }
     }
 
@@ -1047,7 +1111,7 @@
       const SCORE_PER_SAVE = 10;
       const BASE_SPAWN_INTERVAL = 1500;
       const MIN_SPAWN_INTERVAL = 600;
-      const BASE_SPEED_PX_PER_SEC = 40;
+      const BASE_SPEED_PX_PER_SEC = 28;
       const MAX_SPEED_PX_PER_FRAME = 8;
       const BASE_MAX_WORDS = 3;
       const WIN_SCORE = 300;
@@ -1098,7 +1162,9 @@
         toastTimer: 0,
         victoryTriggered: false,
         infiniteMode: false,
-        spawnLocked: false
+        spawnLocked: false,
+        playfieldHeight: 0,
+        keyboardOpen: false
       };
 
       function init() {
@@ -1106,6 +1172,7 @@
         bindEvents();
         updatePauseButton();
         updateSoundUi();
+        updatePlayfieldMetrics();
         layoutWords();
       }
 
@@ -1120,6 +1187,7 @@
         refs.soundToggle.addEventListener("click", toggleSound);
 
         window.addEventListener("resize", () => {
+          updatePlayfieldMetrics();
           layoutWords();
           const activeInput = document.activeElement;
           if (activeInput && activeInput.classList && activeInput.classList.contains("word-input")) {
@@ -1161,6 +1229,7 @@
 
       function startGame() {
         resetState();
+        updatePlayfieldMetrics(true);
         refs.startLayer.classList.add("hidden");
         refs.guideLayer.classList.add("hidden");
         refs.gameOverModal.classList.remove("show");
@@ -1184,6 +1253,7 @@
         refs.victoryModal.classList.remove("show");
         refs.body.classList.remove("victory-mode");
         refs.gameArea.classList.remove("victory-bg");
+        updatePlayfieldMetrics(true);
         state.infiniteMode = true;
         state.victoryTriggered = false;
         state.spawnLocked = false;
@@ -1228,6 +1298,28 @@
         updateHud();
       }
 
+      function updatePlayfieldMetrics(force = false) {
+        const currentHeight = refs.gameArea.getBoundingClientRect().height || refs.gameArea.clientHeight;
+        const activeInput = document.activeElement;
+        const focusingWordInput = !!(activeInput && activeInput.classList && activeInput.classList.contains("word-input"));
+
+        if (!state.playfieldHeight || force) {
+          state.playfieldHeight = currentHeight;
+          state.keyboardOpen = false;
+          return;
+        }
+
+        if (focusingWordInput && currentHeight < state.playfieldHeight * 0.84) {
+          state.keyboardOpen = true;
+          return;
+        }
+
+        if (!focusingWordInput && currentHeight >= state.playfieldHeight * 0.92) {
+          state.keyboardOpen = false;
+          state.playfieldHeight = currentHeight;
+        }
+      }
+
       function gameLoop(timestamp) {
         if (!state.playing) return;
 
@@ -1252,7 +1344,7 @@
 
       function updateWords(delta) {
         const speedPerSec = getCurrentSpeedPxPerSec();
-        const areaHeight = refs.gameArea.clientHeight;
+        const areaHeight = state.playfieldHeight || refs.gameArea.clientHeight;
         const bottomPadding = 12;
         const wordsSnapshot = [...state.words];
 
@@ -1260,7 +1352,7 @@
           word.y += speedPerSec * (delta / 1000);
           syncWordPosition(word);
 
-          if (!state.victoryTriggered && word.y + word.height >= areaHeight - bottomPadding) {
+          if (!state.victoryTriggered && !state.keyboardOpen && word.y + word.height >= areaHeight - bottomPadding) {
             handleWordMiss(word);
           }
         }
@@ -1354,9 +1446,9 @@
       function spawnWord() {
         const card = createWordCard(generateWord());
         refs.lane.appendChild(card.element);
-        const { x, width, height } = pickWordPosition(card.element);
+        const { x, y, width, height } = pickWordSpawnPosition(card.element);
         card.x = x;
-        card.y = 0;
+        card.y = y;
         card.width = width;
         card.height = height;
         syncWordPosition(card);
@@ -1414,35 +1506,51 @@
         return wordObj;
       }
 
-      function pickWordPosition(element) {
+      function pickWordSpawnPosition(element) {
         const areaWidth = refs.gameArea.clientWidth;
         const lanes = window.matchMedia("(min-width: 680px)").matches ? 3 : 2;
-        const laneGap = 10;
-        const padding = 10;
-        const width = Math.min(250, Math.max(150, Math.floor((areaWidth - padding * 2 - laneGap * (lanes - 1)) / lanes)));
+        const laneGap = window.matchMedia("(max-width: 480px)").matches ? 8 : 10;
+        const padding = window.matchMedia("(max-width: 480px)").matches ? 8 : 10;
+        const minWidth = window.matchMedia("(max-width: 480px)").matches ? 132 : 142;
+        const maxWidth = window.matchMedia("(max-width: 480px)").matches ? 190 : 240;
+        const width = Math.min(maxWidth, Math.max(minWidth, Math.floor((areaWidth - padding * 2 - laneGap * (lanes - 1)) / lanes)));
         const laneWidth = width + laneGap;
-        const activeLaneIndexes = new Set();
+        const laneBottoms = new Array(lanes).fill(0);
+        for (let i = 0; i < lanes; i += 1) {
+          laneBottoms[i] = 0;
+        }
 
         for (const word of state.words) {
           const laneIndex = Math.round((word.x - padding) / laneWidth);
-          activeLaneIndexes.add(Math.max(0, Math.min(lanes - 1, laneIndex)));
+          const safeLane = Math.max(0, Math.min(lanes - 1, laneIndex));
+          laneBottoms[safeLane] = Math.max(laneBottoms[safeLane], word.y + word.height);
         }
 
-        const available = [];
-        for (let i = 0; i < lanes; i += 1) {
-          if (!activeLaneIndexes.has(i)) available.push(i);
+        let laneIndex = 0;
+        let minBottom = laneBottoms[0];
+        for (let i = 1; i < laneBottoms.length; i += 1) {
+          if (laneBottoms[i] < minBottom) {
+            minBottom = laneBottoms[i];
+            laneIndex = i;
+          }
         }
 
-        const pool = available.length ? available : Array.from({ length: lanes }, (_, i) => i);
-        const laneIndex = pool[Math.floor(Math.random() * pool.length)];
         const x = padding + laneIndex * laneWidth;
+        const stackGap = window.matchMedia("(max-width: 480px)").matches ? 14 : 18;
+        const spawnY = Math.max(0, laneBottoms[laneIndex] - heightAllowance(element) - stackGap);
 
         element.style.width = `${width}px`;
+        const measuredHeight = element.offsetHeight || 192;
         return {
           x,
+          y: spawnY,
           width,
-          height: element.offsetHeight || 192
+          height: measuredHeight
         };
+      }
+
+      function heightAllowance(element) {
+        return Math.max(90, Math.floor((element.offsetHeight || 192) * 0.6));
       }
 
       function syncWordPosition(word) {
@@ -1688,10 +1796,21 @@
       function layoutWords() {
         const words = [...state.words];
         for (const word of words) {
-          const position = pickWordPosition(word.element);
-          word.x = position.x;
-          word.width = position.width;
-          word.height = word.element.offsetHeight || position.height;
+          const areaWidth = refs.gameArea.clientWidth;
+          const mobile = window.matchMedia("(max-width: 480px)").matches;
+          const lanes = window.matchMedia("(min-width: 680px)").matches ? 3 : 2;
+          const laneGap = mobile ? 8 : 10;
+          const padding = mobile ? 8 : 10;
+          const minWidth = mobile ? 132 : 142;
+          const maxWidth = mobile ? 190 : 240;
+          const width = Math.min(maxWidth, Math.max(minWidth, Math.floor((areaWidth - padding * 2 - laneGap * (lanes - 1)) / lanes)));
+          const laneWidth = width + laneGap;
+          const previousLane = Math.max(0, Math.min(lanes - 1, Math.round((word.x - padding) / laneWidth)));
+
+          word.element.style.width = `${width}px`;
+          word.width = width;
+          word.height = word.element.offsetHeight || word.height;
+          word.x = padding + previousLane * laneWidth;
           syncWordPosition(word);
         }
       }
