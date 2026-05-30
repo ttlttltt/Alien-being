@@ -394,32 +394,72 @@
       color: rgba(255,255,255,0.82);
     }
 
-    .word-input,
-    .rescue-btn {
-      width: 100%;
-      margin-top: 4px;
-      margin-bottom: 4px;
-      min-height: 38px;
-      font-size: 16px;
+    .word-card.selected-card {
+      border-color: rgba(255, 229, 124, 0.9);
+      box-shadow: 0 0 0 2px rgba(255, 229, 124, 0.4), 0 18px 28px rgba(0, 0, 0, 0.28), 0 0 30px rgba(255, 218, 112, 0.18);
+      transform: translate3d(var(--tx, 0px), var(--ty, 0px), 0) scale(1.02);
     }
 
-    .word-input {
+    .word-card.selected-card .alien-label {
+      color: rgba(255, 241, 176, 0.95);
+    }
+
+    .global-controls {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 108px;
+      gap: 10px;
+      align-items: end;
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .global-input-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .selection-chip {
+      min-height: 22px;
+      font-size: 0.84rem;
+      color: rgba(255,255,255,0.78);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .selection-chip strong {
+      color: #ffe07a;
+    }
+
+    .global-input {
+      width: 100%;
+      min-height: 46px;
       border: none;
-      border-radius: 8px;
+      border-radius: 10px;
       outline: none;
-      padding: 0 12px;
-      background: rgba(255,255,255,0.92);
+      padding: 0 14px;
+      background: rgba(255,255,255,0.94);
       color: #111;
       text-transform: uppercase;
+      font-size: 16px;
       box-shadow: inset 0 0 0 2px transparent;
     }
 
-    .word-input:focus {
+    .global-input:focus {
       box-shadow: inset 0 0 0 2px rgba(47, 169, 255, 0.86);
     }
 
-    .rescue-btn {
-      min-height: 40px;
+    .global-rescue-btn {
+      min-height: 46px;
+      width: 100%;
+      font-size: 16px;
     }
 
     .speech-bubble {
@@ -898,13 +938,23 @@
         margin-bottom: 4px;
       }
 
-      .word-input,
-      .rescue-btn {
-        min-height: 34px;
+      .global-controls {
+        grid-template-columns: 1fr 92px;
+        gap: 8px;
+        padding: 10px;
       }
 
-      .rescue-btn {
-        min-height: 36px;
+      .selection-chip {
+        font-size: 0.76rem;
+      }
+
+      .global-input {
+        min-height: 42px;
+        padding: 0 12px;
+      }
+
+      .global-rescue-btn {
+        min-height: 42px;
       }
     }
 
@@ -1052,13 +1102,22 @@
         <div class="center-layer hidden" id="guideLayer">
           <div class="overlay-panel">
             <h2>玩法说明</h2>
-            <p>每张卡片都代表一位等待救援的外星人。请在对应输入框中输入相同的 3 字母单词，点击“救援”或直接按回车。</p>
+            <p>每张卡片都代表一位等待救援的外星人。先点击任意卡片选中目标，再在底部全局输入框中输入相同的 3 字母单词，点击“救援”或直接按回车。</p>
             <p>输入不区分大小写。救援成功得 10 分；单词落地会失去 1 条生命。达到 300 分时会触发营救成功结局。</p>
             <div class="guide-actions">
               <button type="button" class="guide-close" id="guideClose">知道了</button>
             </div>
           </div>
         </div>
+      </div>
+
+      <div class="global-controls" aria-label="全局救援输入区">
+        <div class="global-input-wrap">
+          <div class="selection-chip" id="selectionChip">先点击一个外星人卡片，再输入单词</div>
+          <label class="sr-only" for="globalWordInput">输入当前选中卡片的单词</label>
+          <input id="globalWordInput" class="global-input" type="text" maxlength="3" inputmode="text" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" placeholder="输入选中单词">
+        </div>
+        <button type="button" class="global-rescue-btn" id="globalRescueButton">救援</button>
       </div>
     </section>
   </main>
@@ -1123,6 +1182,9 @@
         gameArea: document.getElementById("gameArea"),
         lane: document.getElementById("lane"),
         effectLayer: document.getElementById("effectLayer"),
+        globalWordInput: document.getElementById("globalWordInput"),
+        globalRescueButton: document.getElementById("globalRescueButton"),
+        selectionChip: document.getElementById("selectionChip"),
         scoreValue: document.getElementById("scoreValue"),
         livesValue: document.getElementById("livesValue"),
         bestValue: document.getElementById("bestValue"),
@@ -1164,7 +1226,8 @@
         infiniteMode: false,
         spawnLocked: false,
         playfieldHeight: 0,
-        keyboardOpen: false
+        keyboardOpen: false,
+        selectedWordId: null
       };
 
       function init() {
@@ -1185,13 +1248,26 @@
         refs.infiniteButton.addEventListener("click", continueInfiniteMode);
         refs.pauseToggle.addEventListener("click", togglePause);
         refs.soundToggle.addEventListener("click", toggleSound);
+        refs.globalRescueButton.addEventListener("click", rescueSelectedWord);
+        refs.globalRescueButton.addEventListener("pointerdown", keepKeyboardAlive);
+        refs.globalWordInput.addEventListener("keydown", event => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            rescueSelectedWord();
+          }
+        });
+        refs.globalWordInput.addEventListener("blur", () => {
+          refs.globalWordInput.value = sanitizeInputValue(refs.globalWordInput.value);
+          if (state.playing && state.selectedWordId) {
+            window.setTimeout(() => focusGlobalInput(true), 0);
+          }
+        });
 
         window.addEventListener("resize", () => {
           updatePlayfieldMetrics();
           layoutWords();
-          const activeInput = document.activeElement;
-          if (activeInput && activeInput.classList && activeInput.classList.contains("word-input")) {
-            requestAnimationFrame(() => keepInputVisible(activeInput));
+          if (document.activeElement === refs.globalWordInput) {
+            requestAnimationFrame(() => keepInputVisible(refs.globalWordInput));
           }
         });
 
@@ -1238,6 +1314,7 @@
         state.paused = false;
         refs.pauseToggle.disabled = false;
         updatePauseButton();
+        updateSelectionChip();
         state.lastFrameTime = performance.now();
         ensureMinimumWords();
         state.animationId = requestAnimationFrame(gameLoop);
@@ -1263,6 +1340,7 @@
         updatePauseButton();
         ensureMinimumWords();
         state.lastFrameTime = performance.now();
+        updateSelectionChip();
         state.animationId = requestAnimationFrame(gameLoop);
       }
 
@@ -1290,18 +1368,20 @@
         state.victoryTriggered = false;
         state.infiniteMode = false;
         state.spawnLocked = false;
+        state.selectedWordId = null;
         refs.body.classList.remove("victory-mode", "failure-mode");
         refs.gameArea.classList.remove("victory-bg", "hit-shake");
         state.words.forEach(word => removeWord(word, true));
         state.words = [];
         refs.effectLayer.innerHTML = "";
+        refs.globalWordInput.value = "";
+        updateSelectionChip();
         updateHud();
       }
 
       function updatePlayfieldMetrics(force = false) {
         const currentHeight = refs.gameArea.getBoundingClientRect().height || refs.gameArea.clientHeight;
-        const activeInput = document.activeElement;
-        const focusingWordInput = !!(activeInput && activeInput.classList && activeInput.classList.contains("word-input"));
+        const focusingWordInput = document.activeElement === refs.globalWordInput;
 
         if (!state.playfieldHeight || force) {
           state.playfieldHeight = currentHeight;
@@ -1459,7 +1539,7 @@
         const element = document.createElement("article");
         element.className = "word-card";
         element.setAttribute("data-word", text);
-        const inputId = `input-${text}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        const cardId = `card-${text}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         element.innerHTML = `
           <div class="card-head">
             <div class="alien-avatar" aria-hidden="true"></div>
@@ -1469,38 +1549,23 @@
             </div>
           </div>
           <p class="word-hint">${getWordHint(text)}</p>
-          <label class="sr-only" for="${inputId}">输入 ${text}</label>
-          <input id="${inputId}" class="word-input" type="text" maxlength="3" inputmode="text" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" placeholder="输入单词">
-          <button type="button" class="rescue-btn">救援</button>
         `;
 
-        const input = element.querySelector(".word-input");
-        const button = element.querySelector(".rescue-btn");
-
         const wordObj = {
+          id: cardId,
           text,
           x: 0,
           y: 0,
           width: 0,
           height: 0,
           element,
-          input,
-          button,
           removing: false
         };
 
-        button.addEventListener("click", () => rescueWord(wordObj));
-        input.addEventListener("keydown", event => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            rescueWord(wordObj);
-          }
-        });
-        input.addEventListener("blur", () => {
-          input.value = sanitizeInputValue(input.value);
-        });
-        input.addEventListener("focus", () => {
-          setTimeout(() => keepInputVisible(input), 120);
+        element.addEventListener("pointerdown", event => {
+          event.preventDefault();
+          selectWord(wordObj.id);
+          focusGlobalInput(false);
         });
 
         return wordObj;
@@ -1559,18 +1624,81 @@
         word.element.style.transform = `translate3d(${word.x}px, ${word.y}px, 0)`;
       }
 
+      function getSelectedWord() {
+        return state.words.find(word => word.id === state.selectedWordId) || null;
+      }
+
+      function selectWord(wordId) {
+        state.selectedWordId = wordId;
+        for (const word of state.words) {
+          word.element.classList.toggle("selected-card", word.id === wordId && !word.removing);
+        }
+        updateSelectionChip();
+      }
+
+      function clearSelection(keepFocus = false) {
+        state.selectedWordId = null;
+        for (const word of state.words) {
+          word.element.classList.remove("selected-card");
+        }
+        updateSelectionChip();
+        if (!keepFocus) {
+          refs.globalWordInput.value = "";
+        }
+      }
+
+      function updateSelectionChip() {
+        const selectedWord = getSelectedWord();
+        if (!selectedWord) {
+          refs.selectionChip.innerHTML = "先点击一个外星人卡片，再输入单词";
+          return;
+        }
+
+        refs.selectionChip.innerHTML = `当前目标：<strong>${selectedWord.text}</strong> · 输入后点击救援`;
+      }
+
+      function focusGlobalInput(selectText = false) {
+        refs.globalWordInput.focus({ preventScroll: true });
+        if (selectText && refs.globalWordInput.value) {
+          refs.globalWordInput.select();
+        }
+        keepInputVisible(refs.globalWordInput);
+      }
+
+      function keepKeyboardAlive(event) {
+        if (!state.playing) return;
+        event.preventDefault();
+        focusGlobalInput(false);
+      }
+
+      function rescueSelectedWord() {
+        const selectedWord = getSelectedWord();
+        if (!selectedWord) {
+          showToast("请先选中一个外星人卡片");
+          focusGlobalInput(false);
+          return;
+        }
+
+        rescueWord(selectedWord);
+        focusGlobalInput(false);
+      }
+
       function rescueWord(word) {
         if (!state.playing || state.paused || word.removing || state.victoryTriggered) return;
 
-        const value = sanitizeInputValue(word.input.value);
-        word.input.value = value;
+        const value = sanitizeInputValue(refs.globalWordInput.value);
+        refs.globalWordInput.value = value;
         if (value !== word.text) {
-          word.input.focus();
-          word.input.select();
+          focusGlobalInput(true);
           return;
         }
 
         word.removing = true;
+        if (state.selectedWordId === word.id) {
+          state.selectedWordId = null;
+          refs.globalWordInput.value = "";
+          updateSelectionChip();
+        }
         state.score += SCORE_PER_SAVE;
         if (state.score > state.bestScore) {
           state.bestScore = state.score;
@@ -1610,6 +1738,9 @@
 
       function removeWord(word, immediate = false) {
         word.removing = true;
+        if (state.selectedWordId === word.id) {
+          clearSelection(true);
+        }
         const index = state.words.indexOf(word);
         if (index >= 0) {
           state.words.splice(index, 1);
